@@ -1,8 +1,1 @@
-var a = 5;
-if (a == 6) {
-    a = 3
-} else {
-    a = 2
-}
-print(a)
-var b = "2323 adwa fg"
+(3+3)*2-1*2

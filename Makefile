@@ -5,7 +5,7 @@ build:
 	go build cmd/exec/main.go
 
 exec:
-	./main.exe $(ARG)
+	./main $(ARG)
 
 exec_def:
-	./main.exe example/input.txt
+	./main example/input.txt

@@ -5,6 +5,8 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/WhoDoIt/GoCompiler/internal/parser"
+	"github.com/WhoDoIt/GoCompiler/internal/syntaxtree"
 	"github.com/WhoDoIt/GoCompiler/internal/tokenizer"
 )
 
@@ -33,4 +35,11 @@ func main() {
 	for _, v := range tk {
 		fmt.Println("[" + strconv.Itoa(int(v.Type)) + ", \"" + v.Content + "\"]")
 	}
+
+	fmt.Println()
+
+	expr := parser.Parse(tk)
+
+	fmt.Println(syntaxtree.StringVisitor{}.Print(expr))
+	fmt.Println(syntaxtree.NumberEvalVisitor{}.Calculate(expr))
 }
