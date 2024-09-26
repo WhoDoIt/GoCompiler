@@ -38,7 +38,11 @@ func main() {
 
 	fmt.Println()
 
-	expr := parser.Parse(tk)
+	expr, err := parser.Parse(tk)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
 
 	fmt.Println(syntaxtree.StringVisitor{}.Print(expr))
 	fmt.Println(syntaxtree.NumberEvalVisitor{}.Calculate(expr))

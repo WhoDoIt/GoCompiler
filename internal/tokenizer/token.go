@@ -14,6 +14,8 @@ const (
 	RIGHT_BRACE
 	LEFT_PAREN
 	RIGHT_PAREN
+	PIPE
+	AMPERSAND
 	PLUS
 	MINUS
 	SLASH
@@ -47,6 +49,7 @@ const (
 	FOR
 	RETURN
 	VAR
+	STRUCT
 
 	EOF
 )
@@ -82,6 +85,10 @@ func (t *tokenizer) TakeToken() (Token, error) {
 		return Token{PLUS, "+", 1}, nil
 	case '-':
 		return Token{MINUS, "-", 1}, nil
+	case '|':
+		return Token{PIPE, "|", 1}, nil
+	case '&':
+		return Token{AMPERSAND, "&", 1}, nil
 	case '/':
 		return Token{SLASH, "/", 1}, nil
 	case '*':

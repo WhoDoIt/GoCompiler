@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"errors"
+
 	"github.com/WhoDoIt/GoCompiler/internal/syntaxtree"
 	"github.com/WhoDoIt/GoCompiler/internal/tokenizer"
 )
@@ -41,74 +43,141 @@ func (p *parser) check(tokenType []tokenizer.TokenType) bool {
 	return false
 }
 
-func Parse(tokens []tokenizer.Token) syntaxtree.Expr {
+func (p *parser) synchronize() {
+	p.advance()
+
+	for !p.isAtEnd() {
+		if p.previus().Type == tokenizer.SEMICOLON {
+			return
+		}
+		switch p.peek().Type {
+		case tokenizer.FN, tokenizer.VAR, tokenizer.IF, tokenizer.ELSE, tokenizer.RETURN, tokenizer.FOR, tokenizer.STRUCT:
+			return
+		}
+		p.advance()
+	}
+}
+
+func Parse(tokens []tokenizer.Token) (syntaxtree.Expr, error) {
 	parser := parser{tokens: tokens}
 	return parser.expression()
 }
 
-func (p *parser) expression() syntaxtree.Expr {
-	return p.equality()
+func (p *parser) expression() (syntaxtree.Expr, error) {
+	return p.bitwise()
 }
 
-func (p *parser) equality() syntaxtree.Expr {
-	expr := p.comparison()
+func (p *parser) bitwise() (syntaxtree.Expr, error) {
+	expr, err := p.equality()
+	if err != nil {
+		return nil, err
+	}
+	for p.check([]tokenizer.TokenType{tokenizer.AMPERSAND, tokenizer.PIPE}) {
+		token := p.peek()
+		p.advance()
+		next, err := p.equality()
+		if err != nil {
+			return nil, err
+		}
+		expr = syntaxtree.Expr(syntaxtree.BinaryExpr{Left: syntaxtree.Expr(expr), Operator: token, Right: next})
+	}
+	return expr, nil
+}
+
+func (p *parser) equality() (syntaxtree.Expr, error) {
+	expr, err := p.comparison()
+	if err != nil {
+		return nil, err
+	}
 	for p.check([]tokenizer.TokenType{tokenizer.EQUAL_EQUAL, tokenizer.EXCLAMATION_EQUAL}) {
 		token := p.peek()
 		p.advance()
-		expr = syntaxtree.Expr(syntaxtree.BinaryExpr{Left: syntaxtree.Expr(expr), Operator: token, Right: p.comparison()})
+		next, err := p.comparison()
+		if err != nil {
+			return nil, err
+		}
+		expr = syntaxtree.Expr(syntaxtree.BinaryExpr{Left: syntaxtree.Expr(expr), Operator: token, Right: next})
 	}
-	return expr
+	return expr, nil
 }
 
-func (p *parser) comparison() syntaxtree.Expr {
-	expr := p.term()
+func (p *parser) comparison() (syntaxtree.Expr, error) {
+	expr, err := p.term()
+	if err != nil {
+		return nil, err
+	}
 	for p.check([]tokenizer.TokenType{tokenizer.LESS, tokenizer.LESS_EQUAL, tokenizer.GREATER, tokenizer.GREATER_EQUAL}) {
 		token := p.peek()
 		p.advance()
-		expr = syntaxtree.Expr(syntaxtree.BinaryExpr{Left: syntaxtree.Expr(expr), Operator: token, Right: p.term()})
+		next, err := p.term()
+		if err != nil {
+			return nil, err
+		}
+		expr = syntaxtree.Expr(syntaxtree.BinaryExpr{Left: syntaxtree.Expr(expr), Operator: token, Right: next})
 	}
-	return expr
+	return expr, nil
 }
 
-func (p *parser) term() syntaxtree.Expr {
-	expr := p.factor()
+func (p *parser) term() (syntaxtree.Expr, error) {
+	expr, err := p.factor()
+	if err != nil {
+		return nil, err
+	}
 	for p.check([]tokenizer.TokenType{tokenizer.PLUS, tokenizer.MINUS}) {
 		token := p.peek()
 		p.advance()
-		expr = syntaxtree.Expr(syntaxtree.BinaryExpr{Left: syntaxtree.Expr(expr), Operator: token, Right: p.factor()})
+		next, err := p.factor()
+		if err != nil {
+			return nil, err
+		}
+		expr = syntaxtree.Expr(syntaxtree.BinaryExpr{Left: syntaxtree.Expr(expr), Operator: token, Right: next})
 	}
-	return expr
+	return expr, nil
 }
 
-func (p *parser) factor() syntaxtree.Expr {
-	expr := p.unary()
+func (p *parser) factor() (syntaxtree.Expr, error) {
+	expr, err := p.unary()
+	if err != nil {
+		return nil, err
+	}
 	for p.check([]tokenizer.TokenType{tokenizer.SLASH, tokenizer.STAR}) {
 		token := p.peek()
 		p.advance()
-		expr = syntaxtree.Expr(syntaxtree.BinaryExpr{Left: syntaxtree.Expr(expr), Operator: token, Right: p.unary()})
+		next, err := p.unary()
+		if err != nil {
+			return nil, err
+		}
+		expr = syntaxtree.Expr(syntaxtree.BinaryExpr{Left: syntaxtree.Expr(expr), Operator: token, Right: next})
 	}
-	return expr
+	return expr, nil
 }
 
-func (p *parser) unary() syntaxtree.Expr {
+func (p *parser) unary() (syntaxtree.Expr, error) {
 	if p.check([]tokenizer.TokenType{tokenizer.EXCLAMATION, tokenizer.MINUS}) {
 		token := p.peek()
 		p.advance()
-		return syntaxtree.Expr(syntaxtree.UnaryExpr{Operator: token, Right: p.unary()})
+		next, err := p.unary()
+		if err != nil {
+			return nil, err
+		}
+		return syntaxtree.Expr(syntaxtree.UnaryExpr{Operator: token, Right: next}), nil
 	} else {
 		return p.primary()
 	}
 }
 
-func (p *parser) primary() syntaxtree.Expr {
+func (p *parser) primary() (syntaxtree.Expr, error) {
 	if p.check([]tokenizer.TokenType{tokenizer.NUMBER, tokenizer.STRING}) {
-		return syntaxtree.Expr(syntaxtree.Literal{Value: p.advance()})
+		return syntaxtree.Expr(syntaxtree.Literal{Value: p.advance()}), nil
 	} else if p.check([]tokenizer.TokenType{tokenizer.LEFT_PAREN}) {
 		p.advance()
-		expr := p.expression()
+		expr, err := p.expression()
+		if err != nil {
+			return nil, err
+		}
 		p.advance()
-		return syntaxtree.Expr(syntaxtree.GroupingExpr{Inside: expr})
+		return syntaxtree.Expr(syntaxtree.GroupingExpr{Inside: expr}), nil
 	} else {
-		return syntaxtree.Literal{Value: tokenizer.Token{Type: tokenizer.EOF, Content: "BRUH", Len: 4}}
+		return nil, errors.New("unexpected end")
 	}
 }

@@ -9,15 +9,15 @@ import (
 type NumberEvalVisitor struct {
 }
 
-func (s NumberEvalVisitor) Calculate(expr Expr) float32 {
+func (s NumberEvalVisitor) Calculate(expr Expr) int {
 	return Accept(s, expr)
 }
 
-func (s NumberEvalVisitor) number(expr Expr) float32 {
+func (s NumberEvalVisitor) number(expr Expr) int {
 	return Accept(s, expr)
 }
 
-func (s NumberEvalVisitor) VisitBinaryExpr(expr BinaryExpr) float32 {
+func (s NumberEvalVisitor) VisitBinaryExpr(expr BinaryExpr) int {
 	switch expr.Operator.Type {
 	case tokenizer.PLUS:
 		return s.number(expr.Left) + s.number(expr.Right)
@@ -27,11 +27,15 @@ func (s NumberEvalVisitor) VisitBinaryExpr(expr BinaryExpr) float32 {
 		return s.number(expr.Left) / s.number(expr.Right)
 	case tokenizer.STAR:
 		return s.number(expr.Left) * s.number(expr.Right)
+	case tokenizer.PIPE:
+		return s.number(expr.Left) | s.number(expr.Right)
+	case tokenizer.AMPERSAND:
+		return s.number(expr.Left) & s.number(expr.Right)
 	}
 	return 0
 }
 
-func (s NumberEvalVisitor) VisitUnaryExpr(expr UnaryExpr) float32 {
+func (s NumberEvalVisitor) VisitUnaryExpr(expr UnaryExpr) int {
 	switch expr.Operator.Type {
 	case tokenizer.EXCLAMATION:
 		return s.number(expr.Right)
@@ -41,11 +45,11 @@ func (s NumberEvalVisitor) VisitUnaryExpr(expr UnaryExpr) float32 {
 	return 0
 }
 
-func (s NumberEvalVisitor) VisitGroupingExpr(expr GroupingExpr) float32 {
+func (s NumberEvalVisitor) VisitGroupingExpr(expr GroupingExpr) int {
 	return s.number(expr.Inside)
 }
 
-func (s NumberEvalVisitor) VisitLiteral(expr Literal) float32 {
+func (s NumberEvalVisitor) VisitLiteral(expr Literal) int {
 	res, _ := strconv.Atoi(expr.Value.Content)
-	return float32(res)
+	return int(res)
 }
