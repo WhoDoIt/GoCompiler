@@ -168,7 +168,7 @@ func (p *parser) unary() (syntaxtree.Expr, error) {
 
 func (p *parser) primary() (syntaxtree.Expr, error) {
 	if p.check([]tokenizer.TokenType{tokenizer.NUMBER, tokenizer.STRING}) {
-		return syntaxtree.Expr(syntaxtree.Literal{Value: p.advance()}), nil
+		return syntaxtree.Expr(syntaxtree.LiteralExpr{Value: p.advance()}), nil
 	} else if p.check([]tokenizer.TokenType{tokenizer.LEFT_PAREN}) {
 		p.advance()
 		expr, err := p.expression()

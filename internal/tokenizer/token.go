@@ -50,6 +50,7 @@ const (
 	RETURN
 	VAR
 	STRUCT
+	PRINT
 
 	EOF
 )
@@ -168,6 +169,8 @@ func (t *tokenizer) TakeToken() (Token, error) {
 	keywords["for"] = FOR
 	keywords["return"] = RETURN
 	keywords["var"] = VAR
+	keywords["struct"] = STRUCT
+	keywords["print"] = PRINT
 
 	for t.IsDigit(t.Peak()) || t.IsGoodChar(t.Peak()) {
 		t.Advance()

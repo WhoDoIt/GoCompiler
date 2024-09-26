@@ -5,8 +5,8 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/WhoDoIt/GoCompiler/internal/interpreter"
 	"github.com/WhoDoIt/GoCompiler/internal/parser"
-	"github.com/WhoDoIt/GoCompiler/internal/syntaxtree"
 	"github.com/WhoDoIt/GoCompiler/internal/tokenizer"
 )
 
@@ -44,6 +44,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println(syntaxtree.StringVisitor{}.Print(expr))
-	fmt.Println(syntaxtree.NumberEvalVisitor{}.Calculate(expr))
+	fmt.Println(interpreter.StringVisitor{}.Print(expr))
+	fmt.Println(interpreter.NumberEvalVisitor{}.Calculate(expr))
 }
