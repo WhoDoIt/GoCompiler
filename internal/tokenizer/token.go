@@ -51,6 +51,8 @@ const (
 	VAR
 	STRUCT
 	PRINT
+	TRUE
+	FALSE
 
 	EOF
 )
@@ -59,12 +61,14 @@ type Token struct {
 	Type    TokenType
 	Content string
 	Len     int
+	Line    int
 }
 
 type tokenizer struct {
 	data    []byte
 	start   int
 	current int
+	line    int
 }
 
 func (t *tokenizer) TakeToken() (Token, error) {
@@ -75,60 +79,63 @@ func (t *tokenizer) TakeToken() (Token, error) {
 	var c = t.Advance()
 	switch c {
 	case '{':
-		return Token{LEFT_BRACE, "{", 1}, nil
+		return Token{LEFT_BRACE, "{", 1, t.line}, nil
 	case '}':
-		return Token{RIGHT_BRACE, "}", 1}, nil
+		return Token{RIGHT_BRACE, "}", 1, t.line}, nil
 	case '(':
-		return Token{LEFT_PAREN, "(", 1}, nil
+		return Token{LEFT_PAREN, "(", 1, t.line}, nil
 	case ')':
-		return Token{RIGHT_PAREN, ")", 1}, nil
+		return Token{RIGHT_PAREN, ")", 1, t.line}, nil
 	case '+':
-		return Token{PLUS, "+", 1}, nil
+		return Token{PLUS, "+", 1, t.line}, nil
 	case '-':
-		return Token{MINUS, "-", 1}, nil
+		return Token{MINUS, "-", 1, t.line}, nil
 	case '|':
-		return Token{PIPE, "|", 1}, nil
+		return Token{PIPE, "|", 1, t.line}, nil
 	case '&':
-		return Token{AMPERSAND, "&", 1}, nil
+		return Token{AMPERSAND, "&", 1, t.line}, nil
 	case '/':
-		return Token{SLASH, "/", 1}, nil
+		return Token{SLASH, "/", 1, t.line}, nil
 	case '*':
-		return Token{STAR, "*", 1}, nil
+		return Token{STAR, "*", 1, t.line}, nil
 	case ';':
-		return Token{SEMICOLON, ";", 1}, nil
+		return Token{SEMICOLON, ";", 1, t.line}, nil
 	case '.':
-		return Token{DOT, ".", 1}, nil
+		return Token{DOT, ".", 1, t.line}, nil
 	case ',':
-		return Token{COMMA, ",", 1}, nil
+		return Token{COMMA, ",", 1, t.line}, nil
 	case '!':
 		if t.Match('=') {
 			t.Advance()
-			return Token{EXCLAMATION_EQUAL, "!=", 2}, nil
+			return Token{EXCLAMATION_EQUAL, "!=", 2, t.line}, nil
 		} else {
-			return Token{EXCLAMATION, "!", 1}, nil
+			return Token{EXCLAMATION, "!", 1, t.line}, nil
 		}
 	case '=':
 		if t.Match('=') {
 			t.Advance()
-			return Token{EQUAL_EQUAL, "==", 2}, nil
+			return Token{EQUAL_EQUAL, "==", 2, t.line}, nil
 		} else {
-			return Token{EQUAL, "=", 1}, nil
+			return Token{EQUAL, "=", 1, t.line}, nil
 		}
 	case '<':
 		if t.Match('=') {
 			t.Advance()
-			return Token{LESS_EQUAL, "<=", 2}, nil
+			return Token{LESS_EQUAL, "<=", 2, t.line}, nil
 		} else {
-			return Token{LESS, "<", 1}, nil
+			return Token{LESS, "<", 1, t.line}, nil
 		}
 	case '>':
 		if t.Match('=') {
 			t.Advance()
-			return Token{GREATER_EQUAL, "!=", 2}, nil
+			return Token{GREATER_EQUAL, "!=", 2, t.line}, nil
 		} else {
-			return Token{GREATER, "!", 1}, nil
+			return Token{GREATER, "!", 1, t.line}, nil
 		}
-	case ' ', '\t', '\r', '\n':
+	case ' ', '\t', '\r':
+		return t.TakeToken()
+	case '\n':
+		t.line += 1
 		return t.TakeToken()
 	case '"':
 		for t.Peak() != '"' && t.Peak() != 0 {
@@ -138,7 +145,7 @@ func (t *tokenizer) TakeToken() (Token, error) {
 			return Token{Type: UNIDENTIFIED}, errors.New("unclosed string")
 		}
 		t.Advance()
-		return Token{STRING, string(t.data[t.start+1 : t.current-1]), t.current - t.start - 2}, nil
+		return Token{STRING, string(t.data[t.start+1 : t.current-1]), t.current - t.start - 2, t.line}, nil
 	}
 
 	switch {
@@ -155,7 +162,7 @@ func (t *tokenizer) TakeToken() (Token, error) {
 				t.Advance()
 			}
 		}
-		return Token{NUMBER, string(t.data[t.start:t.current]), t.current - t.start}, nil
+		return Token{NUMBER, string(t.data[t.start:t.current]), t.current - t.start, t.line}, nil
 
 	}
 
@@ -171,6 +178,8 @@ func (t *tokenizer) TakeToken() (Token, error) {
 	keywords["var"] = VAR
 	keywords["struct"] = STRUCT
 	keywords["print"] = PRINT
+	keywords["true"] = TRUE
+	keywords["false"] = FALSE
 
 	for t.IsDigit(t.Peak()) || t.IsGoodChar(t.Peak()) {
 		t.Advance()
@@ -179,9 +188,9 @@ func (t *tokenizer) TakeToken() (Token, error) {
 	var word = string(t.data[t.start:t.current])
 
 	if val, ok := keywords[word]; ok {
-		return Token{val, word, len(word)}, nil
+		return Token{val, word, len(word), t.line}, nil
 	} else {
-		return Token{IDENTIFIER, word, len(word)}, nil
+		return Token{IDENTIFIER, word, len(word), t.line}, nil
 	}
 }
 
@@ -231,7 +240,7 @@ func (t *tokenizer) PeakNext(off int) byte {
 
 func Tokenize(data []byte) ([]Token, error) {
 	var tokens []Token
-	var tk = tokenizer{data: data}
+	var tk = tokenizer{data: data, line: 1}
 	for !tk.IsAtEnd() {
 		token, err := tk.TakeToken()
 		if err != nil {
@@ -239,6 +248,6 @@ func Tokenize(data []byte) ([]Token, error) {
 		}
 		tokens = append(tokens, token)
 	}
-	tokens = append(tokens, Token{EOF, "EOF", 3})
+	tokens = append(tokens, Token{EOF, "EOF", 3, tk.line})
 	return tokens, nil
 }

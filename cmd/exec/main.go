@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/WhoDoIt/GoCompiler/internal/interpreter"
 	"github.com/WhoDoIt/GoCompiler/internal/parser"
@@ -32,18 +31,19 @@ func main() {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-	for _, v := range tk {
-		fmt.Println("[" + strconv.Itoa(int(v.Type)) + ", \"" + v.Content + "\"]")
-	}
+	// for _, v := range tk {
+	// 	fmt.Println("[" + strconv.Itoa(int(v.Type)) + ", \"" + v.Content + "\"]")
+	// }
 
-	fmt.Println()
+	// fmt.Println()
 
 	expr, err := parser.Parse(tk)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
+	interpreter.Evaluate(expr)
 
-	fmt.Println(interpreter.StringVisitor{}.Print(expr))
-	fmt.Println(interpreter.NumberEvalVisitor{}.Calculate(expr))
+	// fmt.Println(interpreter.StringVisitor{}.Print(expr))
+	// fmt.Println(interpreter.NumberEvalVisitor{}.Calculate(expr))
 }
