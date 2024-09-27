@@ -33,7 +33,7 @@ func (p *parser) advance() tokenizer.Token {
 	return p.previus()
 }
 
-func (p *parser) check(tokenType []tokenizer.TokenType) bool {
+func (p *parser) checkMany(tokenType []tokenizer.TokenType) bool {
 	if p.isAtEnd() {
 		return false
 	}
@@ -42,6 +42,17 @@ func (p *parser) check(tokenType []tokenizer.TokenType) bool {
 			return true
 		}
 	}
+	return false
+}
+
+func (p *parser) check(tokenType tokenizer.TokenType) bool {
+	if p.isAtEnd() {
+		return false
+	}
+	if tokenType == p.peek().Type {
+		return true
+	}
+
 	return false
 }
 
@@ -92,7 +103,7 @@ func Parse(tokens []tokenizer.Token) ([]syntaxtree.Stmt, error) {
 func (p *parser) declaration() (syntaxtree.Stmt, error) {
 	var stmt syntaxtree.Stmt
 	var err error
-	if p.check([]tokenizer.TokenType{tokenizer.VAR}) {
+	if p.check(tokenizer.VAR) {
 		stmt, err = p.varDelc()
 	} else {
 		stmt, err = p.statement()
@@ -107,12 +118,15 @@ func (p *parser) declaration() (syntaxtree.Stmt, error) {
 
 func (p *parser) varDelc() (syntaxtree.Stmt, error) {
 	// ASSUME VAR ALREADY CHECKED
-	p.advance()
-	if !p.check([]tokenizer.TokenType{tokenizer.IDENTIFIER}) {
-		return nil, p.generateError("expected variable name")
+	if !p.check(tokenizer.VAR) {
+		return nil, p.generateError("expected var")
 	}
+	p.advance()
 	name := p.advance()
-	if !p.check([]tokenizer.TokenType{tokenizer.EQUAL}) {
+	if name.Type != tokenizer.IDENTIFIER {
+		return nil, p.generateError("bad name for var")
+	}
+	if !p.check(tokenizer.EQUAL) {
 		return nil, p.generateError("expected =")
 	}
 	p.advance()
@@ -120,7 +134,7 @@ func (p *parser) varDelc() (syntaxtree.Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !p.check([]tokenizer.TokenType{tokenizer.SEMICOLON}) {
+	if !p.check(tokenizer.SEMICOLON) {
 		return nil, p.generateError("expected ;")
 	}
 	p.advance()
@@ -129,11 +143,94 @@ func (p *parser) varDelc() (syntaxtree.Stmt, error) {
 }
 
 func (p *parser) statement() (syntaxtree.Stmt, error) {
-	if p.check([]tokenizer.TokenType{tokenizer.PRINT}) {
+	if p.check(tokenizer.PRINT) {
 		return p.printStmt()
+	} else if p.check(tokenizer.IF) {
+		return p.ifStmt()
+	} else if p.check(tokenizer.LEFT_BRACE) {
+		return p.block()
+	} else if p.check(tokenizer.FOR) {
+		return p.forStmt()
 	} else {
 		return p.exprStmt()
 	}
+}
+
+func (p *parser) forStmt() (syntaxtree.Stmt, error) {
+	p.advance()
+	if !p.check(tokenizer.LEFT_PAREN) {
+		return nil, p.generateError("expected ( after for")
+	}
+	p.advance()
+	prestmt, err := p.varDelc()
+	if err != nil {
+		return nil, err
+	}
+	// if !p.check(tokenizer.SEMICOLON) {
+	// 	return nil, p.generateError("expected ; after PreStatement")
+	// }
+	// p.advance()
+	cond, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+	if !p.check(tokenizer.SEMICOLON) {
+		return nil, p.generateError("expected ; after condition")
+	}
+	p.advance()
+	poststmt, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+
+	if !p.check(tokenizer.RIGHT_PAREN) {
+		return nil, p.generateError("expected ) after for block")
+	}
+	p.advance()
+
+	block, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+	return syntaxtree.ForStmt{PreStatement: prestmt, Condition: cond, PostStatement: poststmt, Block: block}, nil
+}
+
+func (p *parser) ifStmt() (syntaxtree.Stmt, error) {
+	p.advance()
+	if !p.check(tokenizer.LEFT_PAREN) {
+		return nil, p.generateError("expected ( after if")
+	}
+	p.advance()
+	expr, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+	if !p.check(tokenizer.RIGHT_PAREN) {
+		return nil, p.generateError("expected ) after if statement")
+	}
+	p.advance()
+	if !p.check(tokenizer.LEFT_BRACE) {
+		return nil, p.generateError("expected { after if statement")
+	}
+	block, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+	return syntaxtree.IfStmt{Condition: expr, Block: block}, nil
+}
+
+func (p *parser) block() (syntaxtree.Stmt, error) {
+	p.advance()
+	var stmt []syntaxtree.Stmt
+	for !p.check(tokenizer.RIGHT_BRACE) {
+		a, err := p.declaration()
+		if err != nil {
+			return nil, err
+		}
+		stmt = append(stmt, a)
+	}
+	p.advance()
+	return syntaxtree.BlockStmt{Statements: stmt}, nil
 }
 
 func (p *parser) exprStmt() (syntaxtree.Stmt, error) {
@@ -141,7 +238,7 @@ func (p *parser) exprStmt() (syntaxtree.Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !p.check([]tokenizer.TokenType{tokenizer.SEMICOLON}) {
+	if !p.check(tokenizer.SEMICOLON) {
 		return nil, p.generateError("expected ;")
 	}
 	p.advance()
@@ -154,7 +251,7 @@ func (p *parser) printStmt() (syntaxtree.Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !p.check([]tokenizer.TokenType{tokenizer.SEMICOLON}) {
+	if !p.check(tokenizer.SEMICOLON) {
 		return nil, p.generateError("expected ;")
 	}
 	p.advance()
@@ -162,7 +259,26 @@ func (p *parser) printStmt() (syntaxtree.Stmt, error) {
 }
 
 func (p *parser) expression() (syntaxtree.Expr, error) {
-	return p.bitwise()
+	return p.assignment()
+}
+
+func (p *parser) assignment() (syntaxtree.Expr, error) {
+	name, err := p.bitwise()
+	if err != nil {
+		return nil, err
+	}
+	if !p.check(tokenizer.EQUAL) {
+		return name, nil
+	}
+	if val, ok := name.(syntaxtree.LiteralExpr); !ok || val.Value.Type != tokenizer.IDENTIFIER {
+		return nil, p.generateError("expected name")
+	}
+	op := p.advance()
+	expr, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+	return syntaxtree.BinaryExpr{Left: name, Operator: op, Right: expr}, nil
 }
 
 func (p *parser) bitwise() (syntaxtree.Expr, error) {
@@ -170,7 +286,7 @@ func (p *parser) bitwise() (syntaxtree.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	for p.check([]tokenizer.TokenType{tokenizer.AMPERSAND, tokenizer.PIPE}) {
+	for p.checkMany([]tokenizer.TokenType{tokenizer.AMPERSAND, tokenizer.PIPE}) {
 		token := p.peek()
 		p.advance()
 		next, err := p.equality()
@@ -187,7 +303,7 @@ func (p *parser) equality() (syntaxtree.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	for p.check([]tokenizer.TokenType{tokenizer.EQUAL_EQUAL, tokenizer.EXCLAMATION_EQUAL}) {
+	for p.checkMany([]tokenizer.TokenType{tokenizer.EQUAL_EQUAL, tokenizer.EXCLAMATION_EQUAL}) {
 		token := p.peek()
 		p.advance()
 		next, err := p.comparison()
@@ -204,7 +320,7 @@ func (p *parser) comparison() (syntaxtree.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	for p.check([]tokenizer.TokenType{tokenizer.LESS, tokenizer.LESS_EQUAL, tokenizer.GREATER, tokenizer.GREATER_EQUAL}) {
+	for p.checkMany([]tokenizer.TokenType{tokenizer.LESS, tokenizer.LESS_EQUAL, tokenizer.GREATER, tokenizer.GREATER_EQUAL}) {
 		token := p.peek()
 		p.advance()
 		next, err := p.term()
@@ -221,7 +337,7 @@ func (p *parser) term() (syntaxtree.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	for p.check([]tokenizer.TokenType{tokenizer.PLUS, tokenizer.MINUS}) {
+	for p.checkMany([]tokenizer.TokenType{tokenizer.PLUS, tokenizer.MINUS}) {
 		token := p.peek()
 		p.advance()
 		next, err := p.factor()
@@ -238,7 +354,7 @@ func (p *parser) factor() (syntaxtree.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	for p.check([]tokenizer.TokenType{tokenizer.SLASH, tokenizer.STAR}) {
+	for p.checkMany([]tokenizer.TokenType{tokenizer.SLASH, tokenizer.STAR}) {
 		token := p.peek()
 		p.advance()
 		next, err := p.unary()
@@ -251,7 +367,7 @@ func (p *parser) factor() (syntaxtree.Expr, error) {
 }
 
 func (p *parser) unary() (syntaxtree.Expr, error) {
-	if p.check([]tokenizer.TokenType{tokenizer.EXCLAMATION, tokenizer.MINUS}) {
+	if p.checkMany([]tokenizer.TokenType{tokenizer.EXCLAMATION, tokenizer.MINUS}) {
 		token := p.peek()
 		p.advance()
 		next, err := p.unary()
@@ -265,9 +381,9 @@ func (p *parser) unary() (syntaxtree.Expr, error) {
 }
 
 func (p *parser) primary() (syntaxtree.Expr, error) {
-	if p.check([]tokenizer.TokenType{tokenizer.NUMBER, tokenizer.STRING, tokenizer.IDENTIFIER}) {
+	if p.checkMany([]tokenizer.TokenType{tokenizer.NUMBER, tokenizer.STRING, tokenizer.IDENTIFIER}) {
 		return syntaxtree.Expr(syntaxtree.LiteralExpr{Value: p.advance()}), nil
-	} else if p.check([]tokenizer.TokenType{tokenizer.LEFT_PAREN}) {
+	} else if p.check(tokenizer.LEFT_PAREN) {
 		p.advance()
 		expr, err := p.expression()
 		if err != nil {
@@ -279,3 +395,11 @@ func (p *parser) primary() (syntaxtree.Expr, error) {
 		return nil, p.generateError("unexpected end")
 	}
 }
+
+// func (p *parser) variable() (syntaxtree.Expr, error) {
+// 	if p.check(tokenizer.IDENTIFIER) {
+// 		return syntaxtree.Expr(syntaxtree.LiteralExpr{Value: p.advance()}), nil
+// 	} else {
+// 		return nil, p.generateError("expected name of variable")
+// 	}
+// }

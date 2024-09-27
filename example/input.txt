@@ -1,3 +1,9 @@
-var b = "23";
-var a = "12";
-print a + b + 2;
+var f1 = 1;
+var f2 = 1;
+for (var i = 1; i < 15; i = i + 1) {
+    var f = f1 + f2;
+    f1 = f2;
+    f2 = f;
+    print f2;
+}
+print f2;

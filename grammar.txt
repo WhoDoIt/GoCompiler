@@ -1,19 +1,25 @@
-program     -> (statement)* EOF 
+program     -> (declaration)* EOF 
 
 declaration -> varDecl | statement
 
-varDecl     -> "var" IDENTIFIER "=" expression ";"
+varDecl     -> "var" variable "=" expression ";"
 
-statement   -> exprStmt | printStmt
+statement   -> exprStmt | printStmt | ifstmt | forStmt | block
+
+forStmt     -> "for" "(" varDecl expression ";" expression ")" statement
+ifstmt      -> "if" "(" expression ")" statement
+block       -> "{" declaration* "}"
 
 exprStmt    -> expression ";"
 printStmt   -> "print" expression ";"
 
-expression  -> bitwise
+expression  -> assignment
+assignment  -> variable "=" expression | bitwise
 bitwise     -> equality (("|" | "&") equality)*
 equality    -> comparison (("==" | "!=") comparison)*
 comparison  -> term ((">" | "<" | ">=" | "<=") term)*
 term        -> factor (("+" | "-") factor)*
 factor      -> unary (("/" | "*") unary)*
 unary       -> ("!" | "-") unary | primary
-primary     -> IDENTIFIER | STRING | NUMBER | "(" expression ")"
+primary     -> variable | STRING | NUMBER | "(" expression ")"
+variable    -> IDENTIFIER
