@@ -376,8 +376,37 @@ func (p *parser) unary() (syntaxtree.Expr, error) {
 		}
 		return syntaxtree.Expr(syntaxtree.UnaryExpr{Operator: token, Right: next}), nil
 	} else {
-		return p.primary()
+		return p.call()
 	}
+}
+
+func (p *parser) call() (syntaxtree.Expr, error) {
+	expr, err := p.primary()
+	if err != nil {
+		return nil, err
+	}
+	for p.check(tokenizer.LEFT_PAREN) {
+		var args []syntaxtree.Expr
+		p.advance()
+		for !p.isAtEnd() && !p.check(tokenizer.RIGHT_PAREN) {
+			arg, err := p.expression()
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, arg)
+			if !p.check(tokenizer.COMMA) {
+				break
+			}
+			p.advance()
+		}
+		if !p.check(tokenizer.RIGHT_PAREN) {
+			return nil, p.generateError("expected ) after function call")
+		}
+		p.advance()
+		expr = syntaxtree.CallExpr{Calle: expr, Paren: p.previus(), Arguments: args}
+
+	}
+	return expr, nil
 }
 
 func (p *parser) primary() (syntaxtree.Expr, error) {

@@ -73,7 +73,7 @@ type tokenizer struct {
 
 func (t *tokenizer) TakeToken() (Token, error) {
 	if t.IsAtEnd() {
-		return Token{Type: UNIDENTIFIED}, nil
+		return Token{Type: EOF}, nil
 	}
 	t.start = t.current
 	var c = t.Advance()
@@ -248,6 +248,8 @@ func Tokenize(data []byte) ([]Token, error) {
 		}
 		tokens = append(tokens, token)
 	}
-	tokens = append(tokens, Token{EOF, "EOF", 3, tk.line})
+	if tokens[len(tokens)-1].Type != EOF {
+		tokens = append(tokens, Token{EOF, "EOF", 3, tk.line})
+	}
 	return tokens, nil
 }

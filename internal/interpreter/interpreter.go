@@ -9,11 +9,11 @@ import (
 )
 
 type scope struct {
-	vars   map[string]WorkingType
+	vars   map[string]RoseType
 	parent *scope
 }
 
-func (s *scope) GetValue(name string) WorkingType {
+func (s *scope) GetValue(name string) RoseType {
 	if val, ok := s.vars[name]; ok {
 		return val
 	} else {
@@ -25,7 +25,7 @@ func (s *scope) GetValue(name string) WorkingType {
 	}
 }
 
-func (s *scope) AssignValue(name string, val WorkingType) {
+func (s *scope) AssignValue(name string, val RoseType) {
 	if _, ok := s.vars[name]; ok {
 		s.vars[name] = val
 	} else {
@@ -37,7 +37,7 @@ func (s *scope) AssignValue(name string, val WorkingType) {
 	}
 }
 
-func (s *scope) DeclareValue(name string, val WorkingType) {
+func (s *scope) DeclareValue(name string, val RoseType) {
 	s.vars[name] = val
 }
 
@@ -46,7 +46,7 @@ type intepreter struct {
 }
 
 func Evaluate(stmt []syntaxtree.Stmt) {
-	program := intepreter{sc: scope{vars: make(map[string]WorkingType), parent: nil}}
+	program := intepreter{sc: scope{vars: make(map[string]RoseType), parent: nil}}
 	for _, v := range stmt {
 		program.eval(v)
 	}
@@ -56,74 +56,72 @@ func (s *intepreter) eval(stmt syntaxtree.Stmt) {
 	syntaxtree.AcceptStmt(s, stmt)
 }
 
-func (s *intepreter) number(expr syntaxtree.Expr) WorkingType {
-	return syntaxtree.AcceptExpr(s, expr)
+func (s *intepreter) number(expr syntaxtree.Expr) RoseType {
+	res := syntaxtree.AcceptExpr(s, expr)
+	if cast, ok := res.(RuntimeError); ok {
+		fmt.Println("RUNTIME ERROR: " + cast.value)
+	}
+	return res
 }
 
-func (s *intepreter) VisitBinaryExpr(expr syntaxtree.BinaryExpr) WorkingType {
+func (s *intepreter) VisitBinaryExpr(expr syntaxtree.BinaryExpr) RoseType {
 	switch expr.Operator.Type {
-	case tokenizer.PLUS:
-		return s.number(expr.Left).operatorPlus(s.number(expr.Right))
-	case tokenizer.MINUS:
-		return s.number(expr.Left).operatorMinus(s.number(expr.Right))
-	case tokenizer.SLASH:
-		return s.number(expr.Left).operatorSlash(s.number(expr.Right))
-	case tokenizer.STAR:
-		return s.number(expr.Left).operatorStar(s.number(expr.Right))
-	case tokenizer.EQUAL_EQUAL:
-		return s.number(expr.Left).operatorEqual(s.number(expr.Right))
-	case tokenizer.EXCLAMATION_EQUAL:
-		return s.number(expr.Left).operatorEqual(s.number(expr.Right)).operatorExclamation()
-	case tokenizer.LESS:
-		return s.number(expr.Left).operatorLess(s.number(expr.Right))
 	case tokenizer.LESS_EQUAL:
 		left := s.number(expr.Left)
 		right := s.number(expr.Right)
-		result := Bool{value: left.operatorLess(right).value || left.operatorEqual(right).value}
+		if val, ok := left.operatorBinary(tokenizer.LESS, right).(RuntimeError); ok {
+			return val
+		}
+		if val, ok := left.operatorBinary(tokenizer.EQUAL_EQUAL, right).(RuntimeError); ok {
+			return val
+		}
+		result := RoseBool{value: left.operatorBinary(tokenizer.EQUAL_EQUAL, right).(RoseBool).value || left.operatorBinary(tokenizer.LESS_EQUAL, right).(RoseBool).value}
 		return result
 	case tokenizer.GREATER:
 		left := s.number(expr.Left)
 		right := s.number(expr.Right)
-		result := Bool{value: left.operatorLess(right).value || left.operatorEqual(right).value}
-		return result.operatorExclamation()
+		if val, ok := left.operatorBinary(tokenizer.LESS, right).(RuntimeError); ok {
+			return val
+		}
+		if val, ok := left.operatorBinary(tokenizer.EQUAL_EQUAL, right).(RuntimeError); ok {
+			return val
+		}
+		result := RoseBool{value: left.operatorBinary(tokenizer.EQUAL_EQUAL, right).(RoseBool).value || left.operatorBinary(tokenizer.LESS_EQUAL, right).(RoseBool).value}
+		return result.operatorUnary(tokenizer.EXCLAMATION)
 	case tokenizer.GREATER_EQUAL:
-		return s.number(expr.Left).operatorLess(s.number(expr.Right)).operatorExclamation()
+		return s.number(expr.Left).operatorBinary(tokenizer.LESS, s.number(expr.Right)).operatorUnary(tokenizer.EXCLAMATION)
 	case tokenizer.EQUAL:
 		val := s.number(expr.Right)
 		s.sc.AssignValue(expr.Left.(syntaxtree.LiteralExpr).Value.Content, val)
 		return val
-		// case tokenizer.PIPE:
-		// 	return s.number(expr.Left) | s.number(expr.Right)
-		// case tokenizer.AMPERSAND:
-		// 	return s.number(expr.Left) & s.number(expr.Right)
+	default:
+		return s.number(expr.Left).operatorBinary(expr.Operator.Type, s.number(expr.Right))
 	}
-	return s.number(expr.Left).zeroValue()
 }
 
-func (s *intepreter) VisitUnaryExpr(expr syntaxtree.UnaryExpr) WorkingType {
-	switch expr.Operator.Type {
-	case tokenizer.EXCLAMATION:
-		return s.number(expr.Right)
-	case tokenizer.MINUS:
-		return s.number(expr.Right).operatorSelfminus()
-	}
-	return s.number(expr.Right).zeroValue()
+func (s *intepreter) VisitUnaryExpr(expr syntaxtree.UnaryExpr) RoseType {
+	return s.number(expr.Right).operatorUnary(expr.Operator.Type)
 }
 
-func (s *intepreter) VisitGroupingExpr(expr syntaxtree.GroupingExpr) WorkingType {
+func (s *intepreter) VisitGroupingExpr(expr syntaxtree.GroupingExpr) RoseType {
 	return s.number(expr.Inside)
 }
 
-func (s *intepreter) VisitLiteral(expr syntaxtree.LiteralExpr) WorkingType {
+func (s *intepreter) VisitLiteralExpr(expr syntaxtree.LiteralExpr) RoseType {
 	if expr.Value.Type == tokenizer.IDENTIFIER {
 		return s.sc.GetValue(expr.Value.Content)
 	}
 	if expr.Value.Type == tokenizer.STRING {
-		return String{value: expr.Value.Content}
+		return RoseString{value: expr.Value.Content}
 	} else {
 		res, _ := strconv.Atoi(expr.Value.Content)
-		return Int{value: int(res)}
+		return RoseInt{value: int(res)}
 	}
+}
+
+func (s *intepreter) VisitCallExpr(expr syntaxtree.CallExpr) RoseType {
+	panic("BROTHER")
+	return nil
 }
 
 func (s *intepreter) VisitExpressionStmt(stmt syntaxtree.ExpressionStmt) any {
@@ -131,18 +129,18 @@ func (s *intepreter) VisitExpressionStmt(stmt syntaxtree.ExpressionStmt) any {
 	return nil
 }
 func (s *intepreter) VisitPrintStmt(stmt syntaxtree.PrintStmt) any {
-	value := syntaxtree.AcceptExpr(s, stmt.Expression)
+	value := s.number(stmt.Expression)
 	fmt.Println("> ", value)
 	return nil
 }
 func (s *intepreter) VisitVarDeclStmt(stmt syntaxtree.VarDeclStmt) any {
-	value := syntaxtree.AcceptExpr(s, stmt.Expression)
+	value := s.number(stmt.Expression)
 	s.sc.DeclareValue(stmt.Name.Content, value)
 	return nil
 }
 
 func (s *intepreter) VisitForStmt(stmt syntaxtree.ForStmt) any {
-	for s.eval(stmt.PreStatement); s.number(stmt.Condition).(Bool).value; s.number(stmt.PostStatement) {
+	for s.eval(stmt.PreStatement); s.number(stmt.Condition).(RoseBool).value; s.number(stmt.PostStatement) {
 		s.eval(stmt.Block)
 	}
 	return nil
@@ -150,7 +148,7 @@ func (s *intepreter) VisitForStmt(stmt syntaxtree.ForStmt) any {
 
 func (s *intepreter) VisitIfStmt(stmt syntaxtree.IfStmt) any {
 	cond := s.number(stmt.Condition)
-	if val, ok := cond.(Bool); ok {
+	if val, ok := cond.(RoseBool); ok {
 		if val.value {
 			s.eval(stmt.Block)
 		}
@@ -160,7 +158,7 @@ func (s *intepreter) VisitIfStmt(stmt syntaxtree.IfStmt) any {
 
 func (s *intepreter) VisitBlockStmt(stmt syntaxtree.BlockStmt) any {
 	prev := s.sc
-	s.sc = scope{vars: make(map[string]WorkingType), parent: &prev}
+	s.sc = scope{vars: make(map[string]RoseType), parent: &prev}
 	for _, v := range stmt.Statements {
 		s.eval(v)
 	}

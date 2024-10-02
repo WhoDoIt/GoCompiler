@@ -1,6 +1,8 @@
 package interpreter
 
-import "github.com/WhoDoIt/GoCompiler/internal/syntaxtree"
+import (
+	"github.com/WhoDoIt/GoCompiler/internal/syntaxtree"
+)
 
 type StringVisitor struct {
 }
@@ -32,6 +34,10 @@ func (s StringVisitor) VisitGroupingExpr(expr syntaxtree.GroupingExpr) string {
 	return s.string("group", []syntaxtree.Expr{expr.Inside})
 }
 
-func (s StringVisitor) VisitLiteral(expr syntaxtree.LiteralExpr) string {
+func (s StringVisitor) VisitLiteralExpr(expr syntaxtree.LiteralExpr) string {
 	return expr.Value.Content
+}
+
+func (s StringVisitor) VisitCallExpr(expr syntaxtree.CallExpr) string {
+	return s.string("call $"+s.Print(expr.Calle), expr.Arguments)
 }

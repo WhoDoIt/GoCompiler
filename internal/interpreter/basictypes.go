@@ -1,176 +1,156 @@
 package interpreter
 
-type WorkingType interface {
+import (
+	"github.com/WhoDoIt/GoCompiler/internal/tokenizer"
+)
+
+type RoseType interface {
 	getType() string
-	zeroValue() WorkingType
-	operatorPlus(other WorkingType) WorkingType
-	operatorMinus(other WorkingType) WorkingType
-	operatorSlash(other WorkingType) WorkingType
-	operatorStar(other WorkingType) WorkingType
-	operatorExclamation() WorkingType
-	operatorSelfminus() WorkingType
-	operatorLess(other WorkingType) Bool
-	operatorEqual(other WorkingType) Bool
+	zeroValue() RoseType
+	operatorBinary(operator tokenizer.TokenType, other RoseType) RoseType
+	operatorUnary(operator tokenizer.TokenType) RoseType
+	operatorCall(args []RoseType) RoseType
 }
 
-type String struct {
+type RoseString struct {
 	value string
 }
 
-type Int struct {
+type RoseInt struct {
 	value int
 }
 
-type Bool struct {
+type RoseBool struct {
 	value bool
 }
 
-func (s String) getType() string {
+type RuntimeError struct {
+	value string
+}
+
+func tryDifferentTypesError(a RoseType, b RoseType) RuntimeError {
+	if val, ok := a.(RuntimeError); ok {
+		return val
+	}
+	if val, ok := b.(RuntimeError); ok {
+		return val
+	}
+	return RuntimeError{value: "unsupported operation of (" + a.getType() + " and " + b.getType() + ")"}
+}
+
+func (s RoseString) getType() string {
 	return "String"
 }
 
-func (s String) zeroValue() WorkingType {
-	return String{value: ""}
+func (s RoseString) zeroValue() RoseType {
+	return RoseString{value: ""}
 }
 
-func (s String) operatorPlus(other WorkingType) WorkingType {
-	if _, ok := other.(String); !ok {
-		return nil
+func (s RoseString) operatorBinary(operator tokenizer.TokenType, other RoseType) RoseType {
+	if other.getType() != s.getType() {
+		return tryDifferentTypesError(s, other)
 	}
-	return String{value: s.value + other.(String).value}
-}
-
-func (s String) operatorMinus(other WorkingType) WorkingType {
-	return nil
-}
-
-func (s String) operatorSlash(other WorkingType) WorkingType {
-	return nil
-}
-
-func (s String) operatorStar(other WorkingType) WorkingType {
-	return nil
-}
-
-func (s String) operatorExclamation() WorkingType {
-	return nil
-}
-
-func (s String) operatorSelfminus() WorkingType {
-	return nil
-}
-
-func (s String) operatorLess(other WorkingType) Bool {
-	if _, ok := other.(String); !ok {
-		return Bool{}
+	switch operator {
+	case tokenizer.PLUS:
+		return RoseString{value: s.value + other.(RoseString).value}
+	case tokenizer.EQUAL_EQUAL:
+		return RoseBool{value: s.value == other.(RoseString).value}
+	case tokenizer.LESS:
+		return RoseBool{value: s.value < other.(RoseString).value}
 	}
-	return Bool{value: s.value < other.(String).value}
+	return tryDifferentTypesError(s, s)
 }
 
-func (s String) operatorEqual(other WorkingType) Bool {
-	if _, ok := other.(String); !ok {
-		return Bool{}
-	}
-	return Bool{value: s.value == other.(String).value}
+func (s RoseString) operatorUnary(operator tokenizer.TokenType) RoseType {
+	return tryDifferentTypesError(s, s)
 }
 
-func (s Int) getType() string {
+func (s RoseString) operatorCall(args []RoseType) RoseType {
+	return tryDifferentTypesError(s, s)
+}
+
+func (s RoseInt) getType() string {
 	return "Int"
 }
 
-func (s Int) zeroValue() WorkingType {
-	return Int{value: 0}
+func (s RoseInt) zeroValue() RoseType {
+	return RoseInt{value: 0}
 }
 
-func (s Int) operatorPlus(other WorkingType) WorkingType {
-	if _, ok := other.(Int); !ok {
-		return nil
+func (s RoseInt) operatorBinary(operator tokenizer.TokenType, other RoseType) RoseType {
+	if other.getType() != s.getType() {
+		return tryDifferentTypesError(s, other)
 	}
-	return Int{value: s.value + other.(Int).value}
-}
-
-func (s Int) operatorMinus(other WorkingType) WorkingType {
-	if _, ok := other.(Int); !ok {
-		return nil
+	switch operator {
+	case tokenizer.PLUS:
+		return RoseInt{value: s.value + other.(RoseInt).value}
+	case tokenizer.MINUS:
+		return RoseInt{value: s.value - other.(RoseInt).value}
+	case tokenizer.STAR:
+		return RoseInt{value: s.value * other.(RoseInt).value}
+	case tokenizer.SLASH:
+		return RoseInt{value: s.value / other.(RoseInt).value}
+	case tokenizer.PIPE:
+		return RoseInt{value: s.value & other.(RoseInt).value}
+	case tokenizer.AMPERSAND:
+		return RoseInt{value: s.value + other.(RoseInt).value}
+	case tokenizer.EQUAL_EQUAL:
+		return RoseBool{value: s.value == other.(RoseInt).value}
+	case tokenizer.LESS:
+		return RoseBool{value: s.value < other.(RoseInt).value}
 	}
-	return Int{value: s.value - other.(Int).value}
+	return tryDifferentTypesError(s, s)
 }
 
-func (s Int) operatorSlash(other WorkingType) WorkingType {
-	if _, ok := other.(Int); !ok {
-		return nil
+func (s RoseInt) operatorUnary(operator tokenizer.TokenType) RoseType {
+	if operator == tokenizer.MINUS {
+		return RoseInt{value: -s.value}
 	}
-	return Int{value: s.value / other.(Int).value}
+	return tryDifferentTypesError(s, s)
 }
 
-func (s Int) operatorStar(other WorkingType) WorkingType {
-	if _, ok := other.(Int); !ok {
-		return nil
-	}
-	return Int{value: s.value * other.(Int).value}
+func (s RoseInt) operatorCall(args []RoseType) RoseType {
+	return tryDifferentTypesError(s, s)
 }
 
-func (s Int) operatorExclamation() WorkingType {
-	return nil
-}
-
-func (s Int) operatorSelfminus() WorkingType {
-	return Int{value: -s.value}
-}
-
-func (s Int) operatorLess(other WorkingType) Bool {
-	if _, ok := other.(Int); !ok {
-		return Bool{}
-	}
-	return Bool{value: s.value < other.(Int).value}
-}
-
-func (s Int) operatorEqual(other WorkingType) Bool {
-	if _, ok := other.(Int); !ok {
-		return Bool{}
-	}
-	return Bool{value: s.value == other.(Int).value}
-}
-
-func (s Bool) getType() string {
+func (s RoseBool) getType() string {
 	return "Bool"
 }
 
-func (s Bool) zeroValue() WorkingType {
-	return Bool{value: false}
+func (s RoseBool) zeroValue() RoseType {
+	return RoseBool{value: false}
 }
 
-func (s Bool) operatorPlus(other WorkingType) WorkingType {
-	return nil
+func (s RoseBool) operatorBinary(operator tokenizer.TokenType, other RoseType) RoseType {
+	return tryDifferentTypesError(s, s)
 }
 
-func (s Bool) operatorMinus(other WorkingType) WorkingType {
-	return nil
-}
-
-func (s Bool) operatorSlash(other WorkingType) WorkingType {
-	return nil
-}
-
-func (s Bool) operatorStar(other WorkingType) WorkingType {
-	return nil
-}
-
-func (s Bool) operatorExclamation() WorkingType {
-	return Bool{value: !s.value}
-}
-
-func (s Bool) operatorSelfminus() WorkingType {
-	return nil
-}
-
-func (s Bool) operatorLess(other WorkingType) Bool {
-	return Bool{}
-}
-
-func (s Bool) operatorEqual(other WorkingType) Bool {
-	if _, ok := other.(Bool); !ok {
-		return Bool{}
+func (s RoseBool) operatorUnary(operator tokenizer.TokenType) RoseType {
+	if operator == tokenizer.EXCLAMATION {
+		return RoseBool{value: !s.value}
 	}
-	return Bool{value: s.value == other.(Bool).value}
+	return tryDifferentTypesError(s, s)
+}
+
+func (s RoseBool) operatorCall(args []RoseType) RoseType {
+	return tryDifferentTypesError(s, s)
+}
+
+func (s RuntimeError) getType() string {
+	return "RuntimeError"
+}
+
+func (s RuntimeError) zeroValue() RoseType {
+	return s
+}
+func (s RuntimeError) operatorBinary(operator tokenizer.TokenType, other RoseType) RoseType {
+	return s
+}
+
+func (s RuntimeError) operatorUnary(operator tokenizer.TokenType) RoseType {
+	return s
+}
+
+func (s RuntimeError) operatorCall(args []RoseType) RoseType {
+	return s
 }
